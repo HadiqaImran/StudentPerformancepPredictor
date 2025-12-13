@@ -4,43 +4,116 @@ import pickle
 import seaborn as sns
 import matplotlib.pyplot as plt
 
-# ----------------------------
 # Load model, scaler, features
-# ----------------------------
+
 model = pickle.load(open("model_multi.pkl", "rb"))
 scaler = pickle.load(open("scaler.pkl", "rb"))
 features = pickle.load(open("features.pkl", "rb"))
 
-# ----------------------------
+
 # Page Config
-# ----------------------------
+
 st.set_page_config(
     page_title="Student Performance Predictor",
     page_icon="🎓",
     layout="wide"
 )
 
-# ----------------------------
+
 # Load Dataset
-# ----------------------------
+
 df = pd.read_csv("StudentsPerformance.csv")  # make sure CSV is in the same folder
+
+
+# Custom Sidebar Styling
+
+st.markdown(
+    """
+    <style>
+    /* Sidebar background */
+    [data-testid="stSidebar"] > div:first-child {
+        background-color: #8acbe3;
+        padding: 2rem;
+    }
+    /* Sidebar menu items */
+    .sidebar-button {
+        display: block;
+        padding: 0.8rem 1rem;
+        margin: 0.5rem 0;
+        color: #ffffff;
+        background-color: #000000;
+        border-radius: 0.5rem;
+        text-decoration: none;
+        font-weight: bold;
+        transition: all 0.3s ease;
+    }
+    .sidebar-button:hover {
+        background-color: #1f77b4;
+        color: #ffffff;
+    }
+    .sidebar-button-selected {
+        background-color: #ff6600;
+        color: #ffffff;
+    }
+    </style>
+    """,
+    unsafe_allow_html=True
+)
 
 # ----------------------------
 # Sidebar Navigation
 # ----------------------------
-st.sidebar.title("Navigation")
-menu = st.sidebar.radio("Go to", ["Home", "Data", "Graphs", "Predict"])
+st.sidebar.title("🎓 Navigation")
+pages = ["Home", "Data", "Graphs", "Predict"]
+icons = ["🏠", "📊", "📈", "📝"]
+
+# Get selected page
+if "selected_page" not in st.session_state:
+    st.session_state.selected_page = "Home"
+
+for i, page in enumerate(pages):
+    if st.sidebar.button(f"{icons[i]} {page}", key=page):
+        st.session_state.selected_page = page
+
+menu = st.session_state.selected_page
 
 # ----------------------------
 # HOME PAGE
 # ----------------------------
 if menu == "Home":
-    st.title("🎓 Student Performance Predictor")
-    st.write("""
-    Welcome! This app predicts the average exam score of students
-    based on demographic and educational inputs. You can explore
-    the dataset, view graphs, and make predictions.
-    """)
+    # Hero Section
+    st.markdown("""
+    <div style='background-color:#1f77b4; padding:30px; border-radius:15px; color:white; text-align:center;'>
+        <h1>🎓 Student Performance Predictor</h1>
+        <p>Predict the <b>average exam score</b> of students based on demographic and educational inputs.</p>
+        <p>Explore the dataset, visualize data, and make predictions easily.</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Dataset KPIs
+    avg_score = (df["math score"] + df["reading score"] + df["writing score"]) / 3
+    col1, col2, col3, col4 = st.columns(4)
+    col1.metric("Total Students", len(df))
+    col2.metric("Average Math Score", f"{df['math score'].mean():.2f}")
+    col3.metric("Average Reading Score", f"{df['reading score'].mean():.2f}")
+    col4.metric("Average Writing Score", f"{df['writing score'].mean():.2f}")
+
+    st.markdown("<br>", unsafe_allow_html=True)
+
+    # Demographics Charts
+    st.markdown("### 👩‍🎓 Student Demographics")
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,4))
+    df['gender'].value_counts().plot.pie(autopct='%1.1f%%', ax=ax1, colors=['#636efa','#ef553b'])
+    ax1.set_ylabel('')
+    ax1.set_title("Gender Distribution")
+    df['race/ethnicity'].value_counts().plot.bar(ax=ax2, color="#00cc96")
+    ax2.set_title("Race/Ethnicity Distribution")
+    st.pyplot(fig)
+
+    # Tip box
+    st.info("💡 Tip: Students who complete the test preparation course tend to score higher! 🎯")
 
 # ----------------------------
 # DATA PAGE
@@ -59,21 +132,25 @@ elif menu == "Data":
 elif menu == "Graphs":
     st.title("📈 Data Visualizations")
     
-    st.write("Average Scores Distribution")
-    df["average_score"] = (df["math score"] + df["reading score"] + df["writing score"]) / 3
-    fig, ax = plt.subplots()
-    sns.histplot(df["average_score"], kde=True, bins=20, ax=ax)
-    st.pyplot(fig)
+    # KPI Cards
+    avg_score = (df["math score"] + df["reading score"] + df["writing score"]) / 3
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Average Score Mean", f"{avg_score.mean():.2f}")
+    col2.metric("Average Math Score", f"{df['math score'].mean():.2f}")
+    col3.metric("Average Reading Score", f"{df['reading score'].mean():.2f}")
     
-    st.write("Scores by Gender")
-    fig2, ax2 = plt.subplots()
-    sns.boxplot(x="gender", y="average_score", data=df, ax=ax2)
-    st.pyplot(fig2)
+    # Side-by-side plots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12,5))
+    sns.histplot(avg_score, kde=True, bins=20, color="#1f77b4", ax=ax1)
+    ax1.set_title("Average Score Distribution")
+    sns.boxplot(x="gender", y=avg_score, data=df, palette="Set2", ax=ax2)
+    ax2.set_title("Scores by Gender")
+    st.pyplot(fig)
 
-    st.write("Scores by Test Preparation Course")
-    fig3, ax3 = plt.subplots()
-    sns.boxplot(x="test preparation course", y="average_score", data=df, ax=ax3)
-    st.pyplot(fig3)
+    fig2, ax3 = plt.subplots(figsize=(6,5))
+    sns.boxplot(x="test preparation course", y=avg_score, data=df, palette="Set3", ax=ax3)
+    ax3.set_title("Scores by Test Preparation Course")
+    st.pyplot(fig2)
 
 # ----------------------------
 # PREDICT PAGE
@@ -116,9 +193,9 @@ elif menu == "Predict":
         preds = model.predict(scaled)[0]
         avg_score = preds.mean()
         
-        # Fancy cards
+        # Fancy colored boxes
         col1, col2, col3, col4 = st.columns(4)
-        col1.metric("Average Score", f"{avg_score:.2f}")
-        col2.metric("Math Score", f"{preds[0]:.2f}")
-        col3.metric("Reading Score", f"{preds[1]:.2f}")
-        col4.metric("Writing Score", f"{preds[2]:.2f}")
+        col1.markdown(f"<div style='background-color:#00cc96; padding:20px; border-radius:10px; text-align:center; color:white;'><h3>Average Score</h3><h2>{avg_score:.2f}</h2></div>", unsafe_allow_html=True)
+        col2.markdown(f"<div style='background-color:#636efa; padding:20px; border-radius:10px; text-align:center; color:white;'><h3>Math Score</h3><h2>{preds[0]:.2f}</h2></div>", unsafe_allow_html=True)
+        col3.markdown(f"<div style='background-color:#ef553b; padding:20px; border-radius:10px; text-align:center; color:white;'><h3>Reading Score</h3><h2>{preds[1]:.2f}</h2></div>", unsafe_allow_html=True)
+        col4.markdown(f"<div style='background-color:#ffa15a; padding:20px; border-radius:10px; text-align:center; color:white;'><h3>Writing Score</h3><h2>{preds[2]:.2f}</h2></div>", unsafe_allow_html=True)

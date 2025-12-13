@@ -1,68 +1,124 @@
 import streamlit as st
 import pandas as pd
 import pickle
+import seaborn as sns
+import matplotlib.pyplot as plt
 
+# ----------------------------
 # Load model, scaler, features
+# ----------------------------
 model = pickle.load(open("model_multi.pkl", "rb"))
 scaler = pickle.load(open("scaler.pkl", "rb"))
 features = pickle.load(open("features.pkl", "rb"))
 
-st.set_page_config(page_title="Student Performance Predictor", page_icon="🎓", layout="wide")
-st.markdown("<h1 style='text-align: center; color: #4B0082;'>🎓 Student Performance Predictor</h1>", unsafe_allow_html=True)
-st.markdown("<p style='text-align: center; font-size: 18px;'>Predict your average exam score based on your profile</p>", unsafe_allow_html=True)
-st.markdown("---")
+# ----------------------------
+# Page Config
+# ----------------------------
+st.set_page_config(
+    page_title="Student Performance Predictor",
+    page_icon="🎓",
+    layout="wide"
+)
 
-# --- Sidebar Inputs with Tooltips ---
-st.sidebar.header("Student Info 📝")
-gender = st.sidebar.selectbox("Gender", ["male", "female"], help="Select the gender of the student")
-race = st.sidebar.selectbox("Race/Ethnicity", ["group A", "group B", "group C", "group D", "group E"], help="Select the student's race/ethnicity group")
-parent_edu = st.sidebar.selectbox("Parental Education Level", [
-    "some high school", "high school", "some college", "associate's degree", "bachelor's degree", "master's degree"
-], help="Select highest parental education level")
-lunch = st.sidebar.selectbox("Lunch Type", ["standard", "free/reduced"], help="Select type of lunch provided")
-test_prep = st.sidebar.selectbox("Test Preparation Course", ["completed", "none"], help="Did the student complete a test prep course?")
+# ----------------------------
+# Load Dataset
+# ----------------------------
+df = pd.read_csv("StudentsPerformance.csv")  # make sure CSV is in the same folder
 
-# --- Prepare input dataframe ---
-input_df = pd.DataFrame(columns=features)
-input_df.loc[0] = 0
+# ----------------------------
+# Sidebar Navigation
+# ----------------------------
+st.sidebar.title("Navigation")
+menu = st.sidebar.radio("Go to", ["Home", "Data", "Graphs", "Predict"])
 
-# Map user inputs to encoded columns
-if "gender_male" in input_df.columns:
-    input_df["gender_male"] = 1 if gender=="male" else 0
-race_col = f"race/ethnicity_{race}"
-if race_col in input_df.columns:
-    input_df[race_col] = 1
-parent_col = f"parental level of education_{parent_edu}"
-if parent_col in input_df.columns:
-    input_df[parent_col] = 1
-if "lunch_standard" in input_df.columns:
-    input_df["lunch_standard"] = 1 if lunch=="standard" else 0
-test_col = "test preparation course_completed"
-if test_col in input_df.columns:
-    input_df[test_col] = 1 if test_prep=="completed" else 0
+# ----------------------------
+# HOME PAGE
+# ----------------------------
+if menu == "Home":
+    st.title("🎓 Student Performance Predictor")
+    st.write("""
+    Welcome! This app predicts the average exam score of students
+    based on demographic and educational inputs. You can explore
+    the dataset, view graphs, and make predictions.
+    """)
 
-# --- Prediction ---
-if st.button("Predict 🎯"):
-    scaled = scaler.transform(input_df)
-    preds = model.predict(scaled)[0]
-    avg_score = preds.mean()
-
-    st.markdown("<h2 style='text-align: center; color: #008080;'>Your Predicted Scores</h2>", unsafe_allow_html=True)
+# ----------------------------
+# DATA PAGE
+# ----------------------------
+elif menu == "Data":
+    st.title("📊 Dataset Preview")
+    st.write("First 10 rows of the dataset:")
+    st.dataframe(df.head(10))
     
-    col1, col2, col3, col4 = st.columns(4)
+    st.write("Summary Statistics:")
+    st.write(df.describe())
+
+# ----------------------------
+# GRAPHS PAGE
+# ----------------------------
+elif menu == "Graphs":
+    st.title("📈 Data Visualizations")
     
-    # Average Score with fancy highlight
-    col1.markdown(f"<div style='background-color:#FFD700; padding:20px; border-radius:10px; text-align:center;'>"
-                  f"<h3>Average Score</h3><h2 style='color:#4B0082;'>{avg_score:.2f}</h2></div>", unsafe_allow_html=True)
+    st.write("Average Scores Distribution")
+    df["average_score"] = (df["math score"] + df["reading score"] + df["writing score"]) / 3
+    fig, ax = plt.subplots()
+    sns.histplot(df["average_score"], kde=True, bins=20, ax=ax)
+    st.pyplot(fig)
     
-    # Individual scores with progress bars
-    col2.markdown(f"<div style='background-color:#ADD8E6; padding:20px; border-radius:10px; text-align:center;'>"
-                  f"<h3>Math Score</h3><h2>{preds[0]:.2f}</h2></div>", unsafe_allow_html=True)
-    col3.markdown(f"<div style='background-color:#90EE90; padding:20px; border-radius:10px; text-align:center;'>"
-                  f"<h3>Reading Score</h3><h2>{preds[1]:.2f}</h2></div>", unsafe_allow_html=True)
-    col4.markdown(f"<div style='background-color:#FFB6C1; padding:20px; border-radius:10px; text-align:center;'>"
-                  f"<h3>Writing Score</h3><h2>{preds[2]:.2f}</h2></div>", unsafe_allow_html=True)
-    
-    st.markdown("---")
-    st.progress(int(avg_score))  # show progress bar for average score
-    st.info("🎉 Scores are predicted using multi-target Linear Regression. ")
+    st.write("Scores by Gender")
+    fig2, ax2 = plt.subplots()
+    sns.boxplot(x="gender", y="average_score", data=df, ax=ax2)
+    st.pyplot(fig2)
+
+    st.write("Scores by Test Preparation Course")
+    fig3, ax3 = plt.subplots()
+    sns.boxplot(x="test preparation course", y="average_score", data=df, ax=ax3)
+    st.pyplot(fig3)
+
+# ----------------------------
+# PREDICT PAGE
+# ----------------------------
+elif menu == "Predict":
+    st.title("📝 Make a Prediction")
+    st.write("Select student info below:")
+
+    # --- User Inputs ---
+    gender = st.selectbox("Gender", ["male", "female"])
+    race = st.selectbox("Race/Ethnicity", ["group A", "group B", "group C", "group D", "group E"])
+    parent_edu = st.selectbox("Parental Education Level", [
+        "some high school", "high school", "some college", "associate's degree", "bachelor's degree", "master's degree"
+    ])
+    lunch = st.selectbox("Lunch Type", ["standard", "free/reduced"])
+    test_prep = st.selectbox("Test Preparation Course", ["completed", "none"])
+
+    # --- Prepare input dataframe ---
+    input_df = pd.DataFrame(columns=features)
+    input_df.loc[0] = 0
+
+    # Map user inputs to encoded columns
+    if "gender_male" in input_df.columns:
+        input_df["gender_male"] = 1 if gender=="male" else 0
+    race_col = f"race/ethnicity_{race}"
+    if race_col in input_df.columns:
+        input_df[race_col] = 1
+    parent_col = f"parental level of education_{parent_edu}"
+    if parent_col in input_df.columns:
+        input_df[parent_col] = 1
+    if "lunch_standard" in input_df.columns:
+        input_df["lunch_standard"] = 1 if lunch=="standard" else 0
+    test_col = "test preparation course_completed"
+    if test_col in input_df.columns:
+        input_df[test_col] = 1 if test_prep=="completed" else 0
+
+    # --- Prediction ---
+    if st.button("Predict"):
+        scaled = scaler.transform(input_df)
+        preds = model.predict(scaled)[0]
+        avg_score = preds.mean()
+        
+        # Fancy cards
+        col1, col2, col3, col4 = st.columns(4)
+        col1.metric("Average Score", f"{avg_score:.2f}")
+        col2.metric("Math Score", f"{preds[0]:.2f}")
+        col3.metric("Reading Score", f"{preds[1]:.2f}")
+        col4.metric("Writing Score", f"{preds[2]:.2f}")
